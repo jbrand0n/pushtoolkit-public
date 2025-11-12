@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Push Notifications Example Integration</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .button {
+      background: #0ea5e9;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+    .button:hover {
+      background: #0284c7;
+    }
+    .button:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+    .status {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f1f5f9;
+      border-radius: 6px;
+    }
+    .success { background: #d1fae5; }
+    .error { background: #fee2e2; }
+  </style>
+</head>
+<body>
+  <h1>Push Notifications Example</h1>
+  <p>This page demonstrates how to integrate push notifications on your website.</p>
+
+  <div class="status" id="status">
+    <strong>Status:</strong> <span id="statusText">Initializing...</span>
+  </div>
+
+  <div>
+    <button class="button" id="subscribeBtn" onclick="subscribe()">
+      Enable Notifications
+    </button>
+    <button class="button" id="unsubscribeBtn" onclick="unsubscribe()" disabled>
+      Disable Notifications
+    </button>
+  </div>
+
+  <!-- Include the Push SDK -->
+  <script src="sdk.js"></script>
+
+  <script>
+    // Initialize the SDK with your configuration
+    PushSDK.init({
+      apiUrl: 'https://your-api-domain.com/api', // Replace with your API URL
+      siteId: 'your-site-id', // Replace with your site ID
+      vapidPublicKey: 'YOUR_VAPID_PUBLIC_KEY', // Replace with your VAPID public key
+      serviceWorkerPath: '/sw.js',
+      autoPrompt: false, // Set to true to auto-prompt on page load
+      promptDelay: 3000  // Delay before auto-prompt (milliseconds)
+    });
+
+    // Update UI based on subscription status
+    async function updateUI() {
+      const permission = PushSDK.getPermissionStatus();
+      const subscription = await PushSDK.getSubscription();
+
+      const statusText = document.getElementById('statusText');
+      const statusDiv = document.getElementById('status');
+      const subscribeBtn = document.getElementById('subscribeBtn');
+      const unsubscribeBtn = document.getElementById('unsubscribeBtn');
+
+      statusDiv.className = 'status';
+
+      if (permission === 'unsupported') {
+        statusText.textContent = 'Push notifications not supported in this browser';
+        subscribeBtn.disabled = true;
+        statusDiv.classList.add('error');
+      } else if (permission === 'denied') {
+        statusText.textContent = 'Notifications blocked. Please enable in browser settings.';
+        subscribeBtn.disabled = true;
+        statusDiv.classList.add('error');
+      } else if (subscription) {
+        statusText.textContent = 'Subscribed to notifications ✓';
+        subscribeBtn.disabled = true;
+        unsubscribeBtn.disabled = false;
+        statusDiv.classList.add('success');
+      } else if (permission === 'granted') {
+        statusText.textContent = 'Permission granted but not subscribed';
+        subscribeBtn.disabled = false;
+        unsubscribeBtn.disabled = true;
+      } else {
+        statusText.textContent = 'Ready to subscribe';
+        subscribeBtn.disabled = false;
+        unsubscribeBtn.disabled = true;
+      }
+    }
+
+    // Subscribe to notifications
+    async function subscribe() {
+      try {
+        document.getElementById('statusText').textContent = 'Requesting permission...';
+        await PushSDK.promptForPermission();
+        await updateUI();
+      } catch (error) {
+        console.error('Subscription failed:', error);
+        document.getElementById('statusText').textContent = 'Subscription failed: ' + error.message;
+      }
+    }
+
+    // Unsubscribe from notifications
+    async function unsubscribe() {
+      try {
+        document.getElementById('statusText').textContent = 'Unsubscribing...';
+        await PushSDK.unsubscribe();
+        await updateUI();
+      } catch (error) {
+        console.error('Unsubscribe failed:', error);
+        document.getElementById('statusText').textContent = 'Unsubscribe failed: ' + error.message;
+      }
+    }
+
+    // Initialize UI
+    updateUI();
+  </script>
+</body>
+</html>

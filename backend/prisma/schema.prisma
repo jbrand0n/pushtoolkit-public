@@ -1,0 +1,306 @@
+// Prisma Schema for Push Notification Platform
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Core Entities
+// ============================================================================
+
+model User {
+  id                        String    @id @default(uuid())
+  email                     String    @unique
+  passwordHash              String    @map("password_hash")
+  name                      String
+  role                      UserRole  @default(OWNER)
+  emailVerified             Boolean   @default(false) @map("email_verified")
+  emailVerificationToken    String?   @unique @map("email_verification_token")
+  emailVerificationExpires  DateTime? @map("email_verification_expires")
+  passwordResetToken        String?   @unique @map("password_reset_token")
+  passwordResetExpires      DateTime? @map("password_reset_expires")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  updatedAt                 DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  ownedSites    Site[]     @relation("OwnedSites")
+  siteUsers     SiteUser[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Site {
+  id              String   @id @default(uuid())
+  name            String
+  url             String
+  siteId          String   @unique @map("site_id")
+  vapidPublicKey  String   @map("vapid_public_key")
+  vapidPrivateKey String   @map("vapid_private_key") // Encrypted
+  ownerId         String   @map("owner_id")
+  settings        Json?    // Timezone, TTL, icon, etc.
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  owner             User              @relation("OwnedSites", fields: [ownerId], references: [id], onDelete: Cascade)
+  subscribers       Subscriber[]
+  notifications     Notification[]
+  segments          Segment[]
+  welcomeCampaigns  WelcomeCampaign[]
+  siteUsers         SiteUser[]
+  rssFeeds          RssFeed[]
+
+  @@map("sites")
+}
+
+model SiteUser {
+  siteId String   @map("site_id")
+  userId String   @map("user_id")
+  role   SiteRole @default(MEMBER)
+
+  // Relations
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([siteId, userId])
+  @@map("site_users")
+}
+
+model Subscriber {
+  id           String    @id @default(uuid())
+  siteId       String    @map("site_id")
+  endpoint     String    @unique
+  p256dhKey    String    @map("p256dh_key")
+  authKey      String    @map("auth_key")
+  browser      String?
+  os           String?
+  country      String?
+  subscribedAt DateTime  @default(now()) @map("subscribed_at")
+  lastSeenAt   DateTime? @map("last_seen_at")
+  isActive     Boolean   @default(true) @map("is_active")
+  tags         Json?
+  metadata     Json?
+
+  // Relations
+  site         Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  deliveryLogs DeliveryLog[]
+
+  @@index([siteId])
+  @@index([isActive])
+  @@map("subscribers")
+}
+
+model Notification {
+  id             String             @id @default(uuid())
+  siteId         String             @map("site_id")
+  type           NotificationType
+  status         NotificationStatus @default(DRAFT)
+  title          String
+  message        String             @db.Text
+  iconUrl        String?            @map("icon_url")
+  imageUrl       String?            @map("image_url")
+  destinationUrl String?            @map("destination_url")
+  utmParams      Json?              @map("utm_params")
+  actionButtons  Json?              @map("action_buttons")
+  scheduledAt    DateTime?          @map("scheduled_at")
+  sentAt         DateTime?          @map("sent_at")
+  segmentId      String?            @map("segment_id")
+  createdBy      String             @map("created_by")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  site                  Site                   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  segment               Segment?               @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  creator               User                   @relation(fields: [createdBy], references: [id])
+  recurringSchedule     RecurringSchedule?
+  deliveryLogs          DeliveryLog[]
+  analyticsAggregates   AnalyticsAggregate[]
+  welcomeCampaignSteps  WelcomeCampaignStep[]
+
+  @@index([siteId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("notifications")
+}
+
+model RecurringSchedule {
+  id             String   @id @default(uuid())
+  notificationId String   @unique @map("notification_id")
+  intervalType   IntervalType @map("interval_type")
+  intervalValue  Int      @map("interval_value")
+  startDate      DateTime @map("start_date")
+  endDate        DateTime? @map("end_date")
+  nextRunAt      DateTime @map("next_run_at")
+  isActive       Boolean  @default(true) @map("is_active")
+
+  // Relations
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([nextRunAt])
+  @@index([isActive])
+  @@map("recurring_schedules")
+}
+
+model WelcomeCampaign {
+  id        String   @id @default(uuid())
+  siteId    String   @map("site_id")
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  site  Site                  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  steps WelcomeCampaignStep[]
+
+  @@map("welcome_campaigns")
+}
+
+model WelcomeCampaignStep {
+  id             String   @id @default(uuid())
+  campaignId     String   @map("campaign_id")
+  sequenceOrder  Int      @map("sequence_order")
+  notificationId String   @map("notification_id")
+  delayMinutes   Int      @map("delay_minutes")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  campaign     WelcomeCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  notification Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, sequenceOrder])
+  @@map("welcome_campaign_steps")
+}
+
+model Segment {
+  id             String   @id @default(uuid())
+  siteId         String   @map("site_id")
+  name           String
+  rules          Json     // Complex rule engine
+  estimatedCount Int      @default(0) @map("estimated_count")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  site          Site           @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+  rssFeeds      RssFeed[]
+
+  @@map("segments")
+}
+
+model DeliveryLog {
+  id             String         @id @default(uuid())
+  notificationId String         @map("notification_id")
+  subscriberId   String         @map("subscriber_id")
+  status         DeliveryStatus
+  deliveredAt    DateTime?      @map("delivered_at")
+  clickedAt      DateTime?      @map("clicked_at")
+  errorMessage   String?        @db.Text @map("error_message")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  // Relations
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  subscriber   Subscriber   @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@index([subscriberId])
+  @@index([status])
+  @@map("delivery_logs")
+}
+
+model AnalyticsAggregate {
+  id              String   @id @default(uuid())
+  notificationId  String   @map("notification_id")
+  date            DateTime @db.Date
+  sentCount       Int      @default(0) @map("sent_count")
+  deliveredCount  Int      @default(0) @map("delivered_count")
+  clickedCount    Int      @default(0) @map("clicked_count")
+  dismissedCount  Int      @default(0) @map("dismissed_count")
+  failedCount     Int      @default(0) @map("failed_count")
+  valueGenerated  Decimal  @default(0) @map("value_generated") @db.Decimal(10, 2)
+
+  // Relations
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, date])
+  @@map("analytics_aggregates")
+}
+
+model RssFeed {
+  id                    String    @id @default(uuid())
+  siteId                String    @map("site_id")
+  url                   String
+  name                  String
+  iconUrl               String?   @map("icon_url")
+  utmParams             Json?     @map("utm_params")
+  showActionButtons     Boolean   @default(false) @map("show_action_buttons")
+  createDraft           Boolean   @default(false) @map("create_draft")
+  maxPushesPerDay       Int?      @map("max_pushes_per_day")
+  segmentId             String?   @map("segment_id")
+  lastFetchedAt         DateTime? @map("last_fetched_at")
+  lastItemGuid          String?   @map("last_item_guid")
+  isActive              Boolean   @default(true) @map("is_active")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  site    Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  segment Segment? @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+
+  @@index([siteId])
+  @@index([isActive])
+  @@map("rss_feeds")
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum SiteRole {
+  ADMIN
+  MEMBER
+}
+
+enum NotificationType {
+  ONE_TIME
+  RECURRING
+  TRIGGERED
+  WELCOME
+  RSS
+}
+
+enum NotificationStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum IntervalType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum DeliveryStatus {
+  SENT
+  DELIVERED
+  CLICKED
+  DISMISSED
+  FAILED
+}
