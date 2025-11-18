@@ -21,6 +21,7 @@
 - 📈 **Real-Time Stats** - Live campaign performance metrics
 - 🎨 **Customizable UI** - React-based dashboard you can brand
 - 🐳 **Docker Ready** - One-command deployment
+- 📝 **WordPress Plugin** - Native WordPress integration with auto-notifications
 
 ## 📸 Screenshots
 
@@ -143,6 +144,31 @@ npm run generate-vapid
 ```
 
 This will output keys you can add to your `.env` file.
+
+## 🔌 WordPress Integration
+
+PushToolkit includes a native WordPress plugin for seamless integration with WordPress sites.
+
+### Quick Setup
+
+```bash
+# Copy plugin to WordPress
+cp -r wordpress-plugin/pushtoolkit-wp /path/to/wordpress/wp-content/plugins/
+
+# Activate in WordPress admin
+# Go to Plugins > Activate PushToolkit
+```
+
+### Features
+
+- **Auto-Notifications**: Automatically send push notifications when publishing posts
+- **Manual Sending**: Send custom notifications from WordPress dashboard
+- **Subscriber Management**: View and manage subscribers within WordPress
+- **Analytics Dashboard**: Track notification performance in WordPress admin
+- **Per-Post Controls**: Customize or disable notifications for individual posts
+- **Service Worker Auto-Config**: Automatic service worker installation and management
+
+See [WordPress Plugin Documentation](wordpress-plugin/pushtoolkit-wp/README.md) for complete setup instructions.
 
 ## 📚 Usage
 
