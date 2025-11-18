@@ -69,8 +69,8 @@ if (!defined('ABSPATH')) {
                         echo paginate_links(array(
                             'base' => add_query_arg('paged', '%#%'),
                             'format' => '',
-                            'prev_text' => __('&laquo;'),
-                            'next_text' => __('&raquo;'),
+                            'prev_text' => __('&laquo;', 'pushtoolkit-wp'),
+                            'next_text' => __('&raquo;', 'pushtoolkit-wp'),
                             'total' => $total_pages,
                             'current' => $current_page
                         ));

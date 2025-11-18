@@ -61,6 +61,7 @@ class PushToolkit_WP {
      * Include required files
      */
     private function includes() {
+        require_once PUSHTOOLKIT_PLUGIN_DIR . 'includes/class-security.php';
         require_once PUSHTOOLKIT_PLUGIN_DIR . 'includes/class-api-client.php';
         require_once PUSHTOOLKIT_PLUGIN_DIR . 'includes/class-admin.php';
         require_once PUSHTOOLKIT_PLUGIN_DIR . 'includes/class-frontend.php';
@@ -92,6 +93,9 @@ class PushToolkit_WP {
     public function init() {
         // Load text domain for translations
         load_plugin_textdomain('pushtoolkit-wp', false, dirname(plugin_basename(PUSHTOOLKIT_PLUGIN_FILE)) . '/languages');
+
+        // Initialize security
+        new PushToolkit_Security();
 
         // Initialize admin functionality
         if (is_admin()) {
